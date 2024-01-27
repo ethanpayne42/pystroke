@@ -144,11 +144,14 @@ def generate_O3_samples(population_file, keys=['mass_1'], sample_size=5000):
                 n=sample_size, replace=True, weights=weights)
             
             # Saving the samples
+            keys_for_analysis = deepcopy(keys)
+            if 'cos_tilt' in keys:
+                keys_for_analysis.remove('cos_tilt')
+                keys_for_analysis.append('cos_tilt_1')
+                keys_for_analysis.append('cos_tilt_2')
+            samples_reduced = samples_reweighted[keys_for_analysis]
             
-            # Need to save samples a little 
-            # if 'cos_tilt' in keys:
-            
-            print(samples_reweighted)
+            print(samples_reduced)
             
     
     # Get the population contributions: 
