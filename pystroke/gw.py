@@ -3,12 +3,15 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from copy import deepcopy
-
 from scipy.stats import gaussian_kde
+from scipy.interpolate import interp1d
+
+from astropy import units
+from astropy.cosmology import Planck15
 
 import bilby
 import gwpopulation
-from gwpopulation_pipe.data_collection import evaluate_prior, load_all_events
+from gwpopulation_pipe.data_collection import load_all_events
 
 from .distributions import GMMDistribution
 
@@ -23,6 +26,20 @@ a2s = np.random.uniform(0,1)
 costilt1s = np.random.uniform(-1,1)
 costilt2s = np.random.uniform(-1,1)
 chi_eff_prior = gaussian_kde((a1s*costilt1s + qs * a2s * costilt2s)/(1+qs))
+
+def euclidean_distance_prior(redshift):
+    luminosity_distance = Planck15.luminosity_distance(redshift).to(units.Gpc).value
+    return luminosity_distance**2 * (
+        luminosity_distance / (1 + redshift)
+        + (1 + redshift)
+        * Planck15.hubble_distance.to(units.Gpc).value
+        / Planck15.efunc(redshift)
+    )
+
+zs_ = np.linspace(0,2.5,1000)
+p_z = euclidean_distance_prior(dict(redshift=zs_))
+p_z /= np.trapz(p_z, zs_)
+z_prior = interp1d(zs_, p_z)
 
 def generate_O3_samples(population_file, keys=['mass_1'], sample_size=5000):
     
@@ -103,9 +120,7 @@ def generate_O3_samples(population_file, keys=['mass_1'], sample_size=5000):
             prior_dict['a_2'] = 1
             prior_dict['cos_tilt'] = 1/4
 
-            prior_dict['z'] = redshift_model(
-                pd.DataFrame({'redshift':event_posterior['redshift']}), 1).values.T
-            
+            prior_dict['z'] = z_prior(event_posterior['redshift'])
             prior_dict['chi_eff'] = chi_eff_prior(event_posterior['chi_eff'])
             
             # now assign the weights based on the desired calculations 
