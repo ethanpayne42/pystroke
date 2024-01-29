@@ -38,7 +38,12 @@ class PiStroke(object):
             data_term += jax.scipy.special.logsumexp(
                 self.observation_list[i].log_prob(pistroke_array[:,:self.dimensions]).T + pistroke_array[:,-1])
         
-        return data_term + pdet_term
+        log_L = data_term + pdet_term
+        
+        if np.isnan(log_L) == True:
+            return -np.inf
+        else: 
+            return log_L
     
     def negative_log_Lstroke(self, pistroke_array):
         """
