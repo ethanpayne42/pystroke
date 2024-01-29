@@ -41,7 +41,7 @@ p_z = euclidean_distance_prior(dict(redshift=zs_))
 p_z /= np.trapz(p_z, zs_)
 z_prior = interp1d(zs_, p_z)
 
-def generate_O3_samples(population_file, keys=['mass_1'], sample_size=5000):
+def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
     
     # Load the population_file
     hyperpe_result = bilby.core.result.read_in_result(population_file)
@@ -66,6 +66,9 @@ def generate_O3_samples(population_file, keys=['mass_1'], sample_size=5000):
     args.max_redshift = 1.9    
 
     event_posteriors = load_all_events(args)
+    
+    event_GMMs = []
+    prior_cdfs = []
     
     # Looping over all the events to be considered: 
     for event_str in tqdm(event_posteriors):
