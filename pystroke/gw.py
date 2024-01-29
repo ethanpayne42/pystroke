@@ -120,15 +120,15 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
             # Get the individual contributions to the prior
             prior_dict = {}
             
-            prior_dict['mass_1'] = (1 + event_posterior['redshift']) * \
-                event_posterior['mass_1']
-            prior_dict['q'] = 1 + event_posterior['redshift']
+            prior_dict['mass_1'] = np.array((1 + event_posterior['redshift']) * 
+                event_posterior['mass_1'])
+            prior_dict['q'] = np.array(1 + event_posterior['redshift'])
             prior_dict['a_1'] = 1 * np.ones(len(event_posterior))
             prior_dict['a_2'] = 1 * np.ones(len(event_posterior))
             prior_dict['cos_tilt'] = 1/4 * np.ones(len(event_posterior))
 
-            prior_dict['z'] = z_prior(event_posterior['redshift'])
-            prior_dict['chi_eff'] = chi_eff_prior(event_posterior['chi_eff'])
+            prior_dict['z'] = np.array(z_prior(event_posterior['redshift']))
+            prior_dict['chi_eff'] = np.array(chi_eff_prior(event_posterior['chi_eff']))
             
             # now assign the weights based on the desired calculations 
             # should set up for 1D, 2D, and N-D!
