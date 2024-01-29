@@ -115,7 +115,7 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
             redshift_model = gwpopulation.models.redshift.PowerLawRedshift()
             population_prior_dict['z'] = redshift_model(
                 pd.DataFrame({'redshift':event_posterior['redshift']}), 
-                sample_dict['lamb']).values.T
+                lamb=sample_dict['lamb']).values.T
     
             # Get the individual contributions to the prior
             prior_dict = {}
