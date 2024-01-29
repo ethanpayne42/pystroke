@@ -40,8 +40,8 @@ class PiStroke(object):
         
         log_L = data_term + pdet_term
         
-        if np.isnan(log_L) == True:
-            return -np.inf
+        if jnp.isnan(log_L) == True:
+            return -jnp.inf
         else: 
             return log_L
     
