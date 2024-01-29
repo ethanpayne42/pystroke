@@ -144,8 +144,8 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
                 keys_for_astro.remove(key)
                     
             weights = \
-                np.prod(np.array([prior_dict[key] for key in keys_for_astro]),axis=1) /\
-                np.prod(np.array([prior_dict[key] for key in keys_for_prior]),axis=1)
+                np.prod(np.array([prior_dict[key] for key in keys_for_astro]),axis=0) /\
+                np.prod(np.array([prior_dict[key] for key in keys_for_prior]),axis=0)
                 
             samples_reweighted = event_posterior.sample(
                 n=sample_size, replace=True, weights=weights)
