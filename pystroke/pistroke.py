@@ -40,7 +40,7 @@ class PiStroke(object):
         
         log_L = data_term + pdet_term
         
-        return jnp.nan_to_num(log_L, nan=jnp.inf)
+        return jnp.nan_to_num(log_L, nan=-jnp.inf)
     
     def negative_log_Lstroke(self, pistroke_array):
         """
