@@ -37,7 +37,7 @@ def euclidean_distance_prior(redshift):
     )
 
 zs_ = np.linspace(0,2.5,1000)
-p_z = euclidean_distance_prior(dict(redshift=zs_))
+p_z = euclidean_distance_prior(zs_)
 p_z /= np.trapz(p_z, zs_)
 z_prior = interp1d(zs_, p_z)
 
