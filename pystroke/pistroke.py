@@ -40,10 +40,7 @@ class PiStroke(object):
         
         log_L = data_term + pdet_term
         
-        if jnp.isnan(log_L):
-            return -jnp.inf
-        else: 
-            return log_L
+        return jnp.nan_to_num(log_L, nan=jnp.inf)
     
     def negative_log_Lstroke(self, pistroke_array):
         """
