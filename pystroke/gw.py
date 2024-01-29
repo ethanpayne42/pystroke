@@ -5,6 +5,7 @@ from tqdm import tqdm
 from copy import deepcopy
 from scipy.stats import gaussian_kde
 from scipy.interpolate import interp1d
+import os
 
 from astropy import units
 from astropy.cosmology import Planck15
@@ -63,7 +64,10 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
     args.o3b_samples_regex = '/home/ethan.payne/projects/evidencemaximizedprior/observing_run_PE/O3b/*.h5'
     args.preferred_labels = ['C01:Mixed', 'Mixed', 'PrecessingSpinIMRHM', 'Overall']
     args.run_dir = 'outdir/'
-    args.max_redshift = 1.9    
+    args.max_redshift = 1.9
+    
+    if not os.path.exists(f'{args.run_dir}/data/'):
+        os.makedirs(f'{args.run_dir}/data/')
 
     event_posteriors = load_all_events(args)
     
