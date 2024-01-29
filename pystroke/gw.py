@@ -123,9 +123,9 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
             prior_dict['mass_1'] = (1 + event_posterior['redshift']) * \
                 event_posterior['mass_1']
             prior_dict['q'] = 1 + event_posterior['redshift']
-            prior_dict['a_1'] = 1
-            prior_dict['a_2'] = 1
-            prior_dict['cos_tilt'] = 1/4
+            prior_dict['a_1'] = 1 * np.ones(len(event_posterior))
+            prior_dict['a_2'] = 1 * np.ones(len(event_posterior))
+            prior_dict['cos_tilt'] = 1/4 * np.ones(len(event_posterior))
 
             prior_dict['z'] = z_prior(event_posterior['redshift'])
             prior_dict['chi_eff'] = chi_eff_prior(event_posterior['chi_eff'])
@@ -144,8 +144,8 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
                 keys_for_astro.remove(key)
                     
             weights = \
-                np.prod(np.array([prior_dict[key] for key in keys_for_astro]),axis=1) /\
-                np.prod(np.array([prior_dict[key] for key in keys_for_prior]),axis=1)
+                np.prod(np.array([prior_dict[key].values for key in keys_for_astro]),axis=1) /\
+                np.prod(np.array([prior_dict[key].values for key in keys_for_prior]),axis=1)
                 
             samples_reweighted = event_posterior.sample(
                 n=sample_size, replace=True, weights=weights)
