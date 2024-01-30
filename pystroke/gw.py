@@ -95,7 +95,7 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
                     lam=sample_dict['lam'], mpp=sample_dict['mpp'],
                     sigpp=sample_dict['sigpp'], delta_m=sample_dict['delta_m']).values.T
                 
-            population_prior_dict['q'] = \
+            population_prior_dict['mass_ratio'] = \
                 mass_model.p_q(pd.DataFrame({'mass_1':event_posterior['mass_1'], 
                                             'mass_ratio':event_posterior['mass_ratio']}),
                     beta=sample_dict['beta'],
@@ -122,7 +122,7 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
             
             prior_dict['mass_1'] = np.array((1 + event_posterior['redshift']) * 
                 event_posterior['mass_1'])
-            prior_dict['q'] = np.array(1 + event_posterior['redshift'])
+            prior_dict['mass_ratio'] = np.array(1 + event_posterior['redshift'])
             prior_dict['a_1'] = 1 * np.ones(len(event_posterior))
             prior_dict['a_2'] = 1 * np.ones(len(event_posterior))
             prior_dict['cos_tilt'] = 1/4 * np.ones(len(event_posterior))
@@ -133,10 +133,10 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
             # now assign the weights based on the desired calculations 
             # should set up for 1D, 2D, and N-D!
             if 'chi_eff' not in keys:
-                keys_for_prior = ['mass_1', 'q', 'z', 'a_1', 'a_2', 'cos_tilt']
+                keys_for_prior = ['mass_1', 'mass_ratio', 'z', 'a_1', 'a_2', 'cos_tilt']
                 
             else:
-                keys_for_prior = ['mass_1', 'q', 'z', 'chi_eff']
+                keys_for_prior = ['mass_1', 'mass_ratio', 'z', 'chi_eff']
                 
 
             keys_for_astro = deepcopy(keys_for_prior)
