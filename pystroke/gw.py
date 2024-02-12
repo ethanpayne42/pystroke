@@ -159,11 +159,12 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
             
             
             prior_cdfs = []
-            for key in keys_for_analysis:
+            for key in keys:
                 prior_cdfs.append(
                     uniform_generator(np.min(samples_reduced[key]), 
                                       np.max(samples_reduced[key])))
             
+            print(prior_cdfs)
             event_GMM = GMMDistribution(samples_reduced.to_numpy().T, prior_cdfs)
             
         event_GMMs.append(event_GMM)
