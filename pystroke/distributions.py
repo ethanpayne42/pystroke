@@ -3,6 +3,18 @@ import jax
 from sklearn import mixture
 import numpy as np
 
+def uniform_generator(minimum, maximum):
+    
+    def uniform(x):
+        if x < minimum:
+            return 0
+        elif x > maximum:
+            return 1
+        else:
+            return (x - minimum)/(maximum - minimum)
+    
+    return uniform
+
 class GMMDistribution(object):
     
     def __init__(self, samples, priors_cdfs):

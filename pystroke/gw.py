@@ -14,7 +14,7 @@ import bilby
 import gwpopulation
 from gwpopulation_pipe.data_collection import load_all_events
 
-from .distributions import GMMDistribution
+from .distributions import GMMDistribution, uniform_generator
 
 
 # TODO use file:
@@ -72,7 +72,6 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
     event_posteriors = load_all_events(args)
     
     event_GMMs = []
-    prior_cdfs = []
     
     # Looping over all the events to be considered: 
     for event_str in tqdm(event_posteriors):
@@ -148,7 +147,7 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
                 np.prod(np.array([prior_dict[key] for key in keys_for_prior]),axis=0)
                 
             samples_reweighted = event_posterior.sample(
-                n=sample_size, replace=True, weights=weights)
+                n=sample_size, replace=True, weights=weights).reset_index(drop=True)
             
             # Saving the samples
             keys_for_analysis = deepcopy(keys)
@@ -158,10 +157,20 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
                 keys_for_analysis.append('cos_tilt_2')
             samples_reduced = samples_reweighted[keys_for_analysis]
             
-            print(samples_reduced)
+            
+            prior_cdfs = []
+            for key in keys_for_analysis:
+                prior_cdfs.append(
+                    uniform_generator(np.min(samples_reduced[key]), 
+                                      np.max(samples_reduced[key])))
+            
+            event_GMM = GMMDistribution(samples_reduced.to_numpy().T, prior_cdfs)
+            
+        event_GMMs.append(event_GMM)
+        
+    return event_GMMs
             
     
-    # Get the population contributions: 
     
     
     
