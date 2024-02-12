@@ -6,13 +6,10 @@ import numpy as np
 def uniform_generator(minimum, maximum):
     
     def uniform(x):
-        if x < minimum:
-            return 0
-        elif x > maximum:
-            return 1
-        else:
-            return (x - minimum)/(maximum - minimum)
-    
+        arr = (x - minimum)/(maximum - minimum)
+        arr[arr < 0] = 0
+        arr[arr > 1] = 1
+
     return uniform
 
 class GMMDistribution(object):
