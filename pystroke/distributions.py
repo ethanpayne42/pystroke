@@ -7,8 +7,8 @@ def uniform_generator(minimum, maximum):
     
     def uniform(x):
         arr = (x - minimum)/(maximum - minimum)
-        arr[arr < 0] = 0
-        arr[arr > 1] = 1
+        arr = arr.at[arr < 0].set(0)
+        arr = arr.at[arr > 1].set(1)
 
     return uniform
 
