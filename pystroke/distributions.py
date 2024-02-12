@@ -10,6 +10,8 @@ def uniform_generator(minimum, maximum):
         arr = arr.at[arr < 0].set(0)
         arr = arr.at[arr > 1].set(1)
 
+        return arr
+        
     return uniform
 
 class GMMDistribution(object):
