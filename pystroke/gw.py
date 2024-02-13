@@ -168,7 +168,7 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
             print(prior_cdfs)
             event_GMM = GMMDistribution(samples_reduced.to_numpy(), prior_cdfs)
             
-        event_GMMs.append(event_GMM)
+            event_GMMs.append(event_GMM)
         
     return event_GMMs
             
