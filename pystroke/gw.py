@@ -76,6 +76,7 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
     # Looping over all the events to be considered: 
     for event_str in tqdm(event_posteriors):
         event_name = event_str.split('/')[-1].split('.')[0]
+        print(event_name)
         if event_name not in args.ignore:
             event_posterior = event_posteriors[event_str]
 
