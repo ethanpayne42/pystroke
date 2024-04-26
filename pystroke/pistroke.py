@@ -11,7 +11,7 @@ class PiStroke(object):
         """
         TODO
         """
-        self.dimensions = detection_probability.shape()[0]
+        self.dimensions = observation_list[0].dimensions
         self.observation_list = observation_list
         self.detection_probability = detection_probability
         self.N_observations = len(self.observation_list)
@@ -48,7 +48,7 @@ class PiStroke(object):
         """
         return -self.log_Lstroke(pistroke_array)
         
-    def gradient_descent(self, iterations=5, tol=1e-4, weight_min_level=1e-6):
+    def gradient_descent(self, iterations=5, tol=1e-4):
         """
         TODO
         """
@@ -77,10 +77,10 @@ class PiStroke(object):
                 print(f'Minimized result has logL {self.log_Lstroke(pistroke)}')
                 
                 # TODO don't think I need the reduction step
-                pistroke = self.construct_reduced_pistroke(pistroke, tol=tol, weight_min_level=weight_min_level)
+                pistroke = self.construct_reduced_pistroke(pistroke, tol=tol)
                 res = opt_obj.run(init_params=pistroke)
                 pistroke = res.params
-                #pistroke = self.construct_reduced_pistroke(pistroke, tol=tol, weight_min_level=weight_min_level)
+                pistroke = self.construct_reduced_pistroke(pistroke, tol=tol)
 
                 print(f'Minimized and reduced result has logL {self.log_Lstroke(pistroke)}')
                 
@@ -97,7 +97,7 @@ class PiStroke(object):
         return self.result_array_gd
     
     
-    def construct_reduced_pistroke(self, pistroke_array, tol=1e-4, weight_min_level=1e-10):
+    def construct_reduced_pistroke(self, pistroke_array, tol=1e-4):
         """
         TODO
         """

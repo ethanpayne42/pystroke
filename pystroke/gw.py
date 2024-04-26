@@ -9,10 +9,12 @@ import os
 
 from astropy import units
 from astropy.cosmology import Planck15
+import bilby
 
 import bilby
 import gwpopulation
 from gwpopulation_pipe.data_collection import load_all_events
+from gwpopulation_pipe.vt_helper import load_injection_data
 
 from .distributions import GMMDistribution, uniform_generator
 
@@ -42,7 +44,7 @@ p_z = euclidean_distance_prior(zs_)
 p_z /= np.trapz(p_z, zs_)
 z_prior = interp1d(zs_, p_z)
 
-def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
+def generate_GMMs(population_file, keys=['mass_1'], sample_size=5000):
     
     # Load the population_file
     hyperpe_result = bilby.core.result.read_in_result(population_file)
@@ -74,10 +76,10 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
     event_GMMs = []
     
     # Looping over all the events to be considered: 
-    for event_str in tqdm(event_posteriors):
+    for event_idx, event_str in tqdm(enumerate(event_posteriors)):
         event_name = event_str.split('/')[-1].split('.')[0]
         print(event_name)
-        if event_name not in args.ignore:
+        if event_name not in args.ignore:# and event_idx < 5:
             event_posterior = event_posteriors[event_str]
 
             event_posterior['chi_eff'] = (event_posterior['a_1']*event_posterior['cos_tilt_1'] + event_posterior['mass_ratio']*event_posterior['a_2']*event_posterior['cos_tilt_2']) / \
@@ -144,11 +146,11 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
                 keys_for_astro.remove(key)
                     
             weights = \
-                np.prod(np.array([prior_dict[key] for key in keys_for_astro]),axis=0) /\
+                np.prod(np.array([population_prior_dict[key] for key in keys_for_astro]),axis=0) /\
                 np.prod(np.array([prior_dict[key] for key in keys_for_prior]),axis=0)
                 
             samples_reweighted = event_posterior.sample(
-                n=sample_size, replace=True, weights=weights).reset_index(drop=True)
+                frac=0.05, replace=False, weights=weights).reset_index(drop=True)
             
             # Saving the samples
             keys_for_analysis = deepcopy(keys)
@@ -162,15 +164,142 @@ def generate_O3_GMMs(population_file, keys=['mass_1'], sample_size=5000):
             prior_cdfs = []
             for key in keys:
                 prior_cdfs.append(
-                    uniform_generator(np.min(samples_reduced[key])*0.99, 
-                                      np.max(samples_reduced[key])*1.01))
+                    uniform_generator(np.min(event_posterior[key])*0.99, 
+                                      np.max(event_posterior[key])*1.01))
             
-            print(prior_cdfs)
             event_GMM = GMMDistribution(samples_reduced.to_numpy(), prior_cdfs)
             
             event_GMMs.append(event_GMM)
         
     return event_GMMs
+
+
+def generate_pdet_GMM(pdet_file, population_file, keys=['mass_1'], snr_threshold=10, ifar_threshold=1, sample_size=10000):
+    # pdet file: /home/reed.essick/rates+pop/o1+o2+o3-sensitivity-estimates/LIGO-T2100377-v2/o1+o2+o3_bbhpop_real+semianalytic-LIGO-T2100377-v2.hdf5
+    # pop file: /home/jacob.golomb/O3b/nov24/o1o2o3_default/init/result/o1o2o3_mass_c_iid_mag_iid_tilt_powerlaw_redshift_result.json
+    
+    # Reading in the injections
+    found_injections_data = pd.DataFrame.from_dict(load_injection_data(pdet_file, snr_threshold=snr_threshold, ifar_threshold=ifar_threshold))
+    found_injections_chi_eff = (found_injections_data['a_1']*found_injections_data['cos_tilt_1'] + \
+        found_injections_data['mass_ratio'] * found_injections_data['a_2'] * found_injections_data['cos_tilt_2']) /\
+        (1+found_injections_data['mass_ratio'])
+    
+    # Load the population_file
+    hyperpe_result = bilby.core.result.read_in_result(population_file)
+    hyper_posterior = hyperpe_result.posterior
+    hyper_posterior_sample = hyper_posterior.iloc[np.argmax(hyper_posterior["log_likelihood"] + hyper_posterior["log_prior"])]
+    sample_dict = {key:hyper_posterior_sample[key] for key in hyper_posterior_sample.keys()}
+
+    sample_dict,_ = gwpopulation.conversions.convert_to_beta_parameters(sample_dict)
+    
+    # Getting the population_prior_dict
+    population_prior_dict = {}
+            
+    mass_model = gwpopulation.models.mass.SinglePeakSmoothedMassDistribution()
+
+    population_prior_dict['mass_1'] = \
+        mass_model.p_m1(pd.DataFrame({'mass_1':found_injections_data['mass_1']}),
+            alpha=sample_dict['alpha'],
+            mmin=sample_dict['mmin'], mmax=sample_dict['mmax'],
+            lam=sample_dict['lam'], mpp=sample_dict['mpp'],
+            sigpp=sample_dict['sigpp'], delta_m=sample_dict['delta_m']).values.T
+        
+    population_prior_dict['mass_ratio'] = \
+        mass_model.p_q(pd.DataFrame({'mass_1':found_injections_data['mass_1'], 
+                                    'mass_ratio':found_injections_data['mass_ratio']}),
+            beta=sample_dict['beta'],
+            mmin=sample_dict['mmin'], delta_m=sample_dict['delta_m'])
+    
+    population_prior_dict['a_1'] = gwpopulation.utils.beta_dist(
+        found_injections_data['a_1'], sample_dict['alpha_chi'],
+        sample_dict['beta_chi'], scale=sample_dict['amax'])
+    population_prior_dict['a_2'] = gwpopulation.utils.beta_dist(
+        found_injections_data['a_2'], sample_dict['alpha_chi'],
+        sample_dict['beta_chi'], scale=sample_dict['amax'])
+    
+    population_prior_dict['cos_tilt'] = (1 - sample_dict['xi_spin']) / 4 + sample_dict['xi_spin'] * \
+        gwpopulation.utils.truncnorm(np.arccos(found_injections_data['cos_tilt_1']), 1, sample_dict['sigma_spin'], 1, -1) * \
+        gwpopulation.utils.truncnorm(np.arccos(found_injections_data['cos_tilt_2']), 1, sample_dict['sigma_spin'], 1, -1)
+
+    redshift_model = gwpopulation.models.redshift.PowerLawRedshift()
+    population_prior_dict['z'] = redshift_model(
+        pd.DataFrame({'redshift':np.array(found_injections_data['redshift'])}), 
+        lamb=sample_dict['lamb']).values.T
+
+    # Get the contributions to the prior
+    
+    mass_prior = bilby.core.prior.PowerLaw(alpha=-2.35, minimum=2, maximum=100)
+    mass2_prior = bilby.core.prior.PowerLaw(alpha=1.0, minimum=2, maximum=100)
+    
+    prior_dict = {}
+    
+    prior_dict['mass_1'] = mass_prior.prob(found_injections_data['mass_1'])
+    
+    # Calculate the faked chi_eff 
+    chi_eff_prior_dist = []
+    q_prior_dist = []
+    for i in tqdm(range(100000)):
+        mass1 = mass_prior.sample()
+        mass2 = mass2_prior.sample()
+        q = mass2/mass1
+            
+        if q <= 1.0:
+            chi1 = np.random.uniform(0,1); chi2 = np.random.uniform(0,1)
+            t1 = np.random.uniform(-1,1); t2 = np.random.uniform(-1,1)
+            
+            chi_eff_prior_dist.append((chi1*t1 + q*chi2*t2)/(1+q))
+            q_prior_dist.append(q)
+    
+    print(len(found_injections_data['mass_1']))
+    prior_dict['chi_eff'] = gaussian_kde(np.array(chi_eff_prior_dist))(found_injections_chi_eff)
+    prior_dict['mass_ratio'] = gaussian_kde(np.concatenate([np.array(q_prior_dist), 2-np.array(q_prior_dist)]))(found_injections_data['mass_ratio'])
+    prior_dict['a_1'] = 1 * np.ones(len(found_injections_data['mass_1']))
+    prior_dict['a_2'] = 1 * np.ones(len(found_injections_data['mass_1']))
+    prior_dict['cos_tilt'] = 1/4 * np.ones(len(found_injections_data['mass_1']))
+
+    prior_dict['z'] = redshift_model(pd.DataFrame({'redshift':np.array(found_injections_data['redshift'])}), lamb=1.0).values.T
+    
+    # now assign the weights based on the desired calculations 
+    # should set up for 1D, 2D, and N-D!
+    if 'chi_eff' not in keys:
+        keys_for_prior = ['mass_1', 'mass_ratio', 'z', 'a_1', 'a_2', 'cos_tilt']
+        
+    else:
+        keys_for_prior = ['mass_1', 'mass_ratio', 'z', 'chi_eff']
+        
+
+    keys_for_astro = deepcopy(keys_for_prior)
+    for key in keys:
+        keys_for_astro.remove(key)
+
+    print([len(prior_dict[key]) for key in keys_for_prior])
+    print(np.prod(np.array([prior_dict[key] for key in keys_for_prior]),axis=0))
+
+    weights = \
+        np.prod(np.array([population_prior_dict[key] for key in keys_for_astro]),axis=0) /\
+        np.prod(np.array([prior_dict[key] for key in keys_for_prior]),axis=0)
+        
+    samples_reweighted = found_injections_data.sample(
+        frac=0.05, replace=False, weights=weights).reset_index(drop=True)
+    
+    # Saving the samples
+    keys_for_analysis = deepcopy(keys)
+    if 'cos_tilt' in keys:
+        keys_for_analysis.remove('cos_tilt')
+        keys_for_analysis.append('cos_tilt_1')
+        keys_for_analysis.append('cos_tilt_2')
+    samples_reduced = samples_reweighted[keys_for_analysis]
+    
+    prior_cdfs = []
+    for key in keys:
+        prior_cdfs.append(
+            uniform_generator(np.min(found_injections_data[key])*0.99, 
+                                np.max(found_injections_data[key])*1.01))
+    
+    pdet_GMM = GMMDistribution(samples_reduced.to_numpy(), prior_cdfs)
+    
+    return pdet_GMM
+    
             
     
     

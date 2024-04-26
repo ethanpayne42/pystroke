@@ -7,10 +7,7 @@ def uniform_generator(minimum, maximum):
     
     def uniform(x):
         arr = (x - minimum)/(maximum - minimum)
-        arr = arr.at[arr < 0].set(0)
-        arr = arr.at[arr > 1].set(1)
-
-        return arr
+        return jnp.where(arr < 1, jnp.where(arr > 0, arr, 0), 1)
         
     return uniform
 
@@ -51,14 +48,22 @@ class GMMDistribution(object):
         
         # return jax.scipy.special.logsumexp(-0.5 * (self.dimensions * jnp.log(2 * np.pi) + log_p) + log_det + jnp.log(self.GMM_fitted_distribution.weights_), axis=1) - log_norm
         # Removed + log_det  as the normalization is not important here - removed from here    VVVVVV
-        return jax.scipy.special.logsumexp(-0.5 * (self.dimensions * jnp.log(2 * np.pi) + log_p) + jnp.log(self.GMM_fitted_distribution.weights_), axis=1) - log_norm
+        log_l_event = jax.scipy.special.logsumexp(-0.5 * (self.dimensions * jnp.log(2 * np.pi) + log_p) 
+            + jnp.log(self.GMM_fitted_distribution.weights_), axis=1) - log_norm
+        
+        log_l_event = jnp.nan_to_num(log_l_event, nan=-jnp.inf)
+        
+        return log_l_event
     
     def transform_samples(self, samples):
         
         transformed_samples = []
         
         for i in range(self.dimensions):
-           transformed_samples.append(jnp.sqrt(2)*jax.scipy.special.erfinv(2*self.priors_cdfs[i](samples[:,i])-1))
+            prior_probs = self.priors_cdfs[i](samples[:,i])
+            
+            
+            transformed_samples.append(jnp.sqrt(2)*jax.scipy.special.erfinv(2*prior_probs-1))
         
         return jnp.array(transformed_samples)
     
@@ -68,7 +73,7 @@ class GMMDistribution(object):
         best_gmm = mixture.GaussianMixture(n_components=1).fit(transformed_samples[:int(0.8*len(transformed_samples.T))].T)
         best_bic = best_gmm.bic(transformed_samples[:int(len(transformed_samples.T))-int(0.2*len(transformed_samples.T))].T)
         
-        for n_comp in range(2,16):
+        for n_comp in range(2,5):
             gmm = mixture.GaussianMixture(n_components=n_comp).fit(transformed_samples[:int(0.8*len(transformed_samples.T))].T)
             bic = gmm.bic(transformed_samples[:int(len(transformed_samples.T))-int(0.2*len(transformed_samples.T))].T)
             
