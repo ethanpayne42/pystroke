@@ -32,13 +32,15 @@ class PiStroke(object):
         """
         pdet_term = - self.N_observations * jax.scipy.special.logsumexp(
             self.detection_probability.log_prob(pistroke_array[:,:self.dimensions]).T + pistroke_array[:,-1])
+        
+        pdet_term_noinfs = jax.lax.select(jnp.isfinite(pdet_term), pdet_term, -jnp.inf)
 
         data_term = jnp.array(0)
         for i in range(self.N_observations):
             data_term += jax.scipy.special.logsumexp(
                 self.observation_list[i].log_prob(pistroke_array[:,:self.dimensions]).T + pistroke_array[:,-1])
         
-        log_L = data_term + pdet_term
+        log_L = data_term + pdet_term_noinfs
         
         return jnp.nan_to_num(log_L, nan=-jnp.inf)
     
@@ -46,9 +48,10 @@ class PiStroke(object):
         """
         TODO
         """
-        return -self.log_Lstroke(pistroke_array)
+        logL = self.log_Lstroke(pistroke_array)
+        return - logL
         
-    def gradient_descent(self, iterations=5, tol=1e-4):
+    def gradient_descent(self, iterations=5, delta_diff=1e-4, tol=1e-4, lower=jnp.array([5]), upper=jnp.array([100])):
         """
         TODO
         """
@@ -70,19 +73,31 @@ class PiStroke(object):
                 print(f'Random initialized position has logL {self.log_Lstroke(init_pistroke)}')
                 
                 # Initial run 
-                opt_obj = jaxopt.GradientDescent(self.negative_log_Lstroke)
-                res = opt_obj.run(init_params=init_pistroke)
+                opt_obj = jaxopt.ProjectedGradient(self.negative_log_Lstroke, projection=jaxopt.projection.projection_box)
+                res = opt_obj.run(
+                    init_params=init_pistroke, 
+                    hyperparams_proj=(jnp.concatenate([jnp.atleast_1d(lower), jnp.atleast_1d(jnp.array([-jnp.inf]))]), 
+                                      jnp.concatenate([jnp.atleast_1d(upper), jnp.atleast_1d(jnp.array([jnp.inf]))])))
                 pistroke = res.params
+                print(pistroke)
                 
                 print(f'Minimized result has logL {self.log_Lstroke(pistroke)}')
                 
                 # TODO don't think I need the reduction step
-                pistroke = self.construct_reduced_pistroke(pistroke, tol=tol)
-                res = opt_obj.run(init_params=pistroke)
+                pistroke = self.construct_reduced_pistroke(pistroke, delta_diff=delta_diff)
+                res = opt_obj.run(
+                    init_params=pistroke,
+                    hyperparams_proj=(jnp.concatenate([jnp.atleast_1d(lower), jnp.atleast_1d(jnp.array([-jnp.inf]))]), 
+                                      jnp.concatenate([jnp.atleast_1d(upper), jnp.atleast_1d(jnp.array([jnp.inf]))])))
+                
                 pistroke = res.params
-                pistroke = self.construct_reduced_pistroke(pistroke, tol=tol)
-
+                print(pistroke)
                 print(f'Minimized and reduced result has logL {self.log_Lstroke(pistroke)}')
+                
+                # pistroke = self.combine_delta_functions(pistroke, tol=tol)
+                # print(pistroke)
+
+                # print(f'Minimized, reduced, and combined result has logL {self.log_Lstroke(pistroke)}')
                 
                 if i == 0:
                     self.result_array_gd = pistroke
@@ -97,7 +112,28 @@ class PiStroke(object):
         return self.result_array_gd
     
     
-    def construct_reduced_pistroke(self, pistroke_array, tol=1e-4):
+    def construct_reduced_pistroke(self, pistroke_array, delta_diff=-4):
+        """
+        TODO
+        """
+        
+        # Construct sorted pistroke
+        sorted_pistroke = jnp.array(pistroke_array[pistroke_array[:, -1].argsort()[::-1]])
+        
+        # Construct reduced pistroke
+        reduced_pistroke = []
+        max_weight = jnp.max(sorted_pistroke[:,-1])
+        for i in range(len(sorted_pistroke)):
+            
+            if sorted_pistroke[i, -1] - max_weight > delta_diff:
+                reduced_pistroke.append(sorted_pistroke[i])
+        
+        reduced_pistroke = jnp.array(reduced_pistroke)
+        reduced_pistroke = reduced_pistroke.at[:,-1].set(reduced_pistroke[:,-1] - scipy.special.logsumexp(reduced_pistroke[:,-1]))
+        
+        return jnp.array(reduced_pistroke[reduced_pistroke[:, -1].argsort()[::-1]])
+        
+    def combine_delta_functions(self, pistroke_array, tol=1e-4):
         """
         TODO
         """
@@ -127,4 +163,3 @@ class PiStroke(object):
         reduced_pistroke = reduced_pistroke.at[:,-1].set(reduced_pistroke[:,-1] - scipy.special.logsumexp(reduced_pistroke[:,-1]))
         
         return jnp.array(reduced_pistroke[reduced_pistroke[:, -1].argsort()[::-1]])
-        

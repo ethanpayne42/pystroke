@@ -2,6 +2,7 @@ import pystroke
 import jax.numpy as jnp
 import numpyro.distributions as dist
 import matplotlib.pyplot as plt
+import numpy as np
 
 #Load GWTC-3 samples
 event_GMMs = pystroke.generate_GMMs(
@@ -15,11 +16,9 @@ pdet_GMM = pystroke.generate_pdet_GMM(
 
 pistroke_pdet = pystroke.PiStroke(event_GMMs, pdet_GMM)
 
-#_ = pistroke_pdet.gradient_descent(iterations=2, delta_diff=1e-4, tol=1e-3, lower=jnp.array([1e-5]), upper=jnp.array([2]))
-#_ = pistroke_pdet.gradient_descent(iterations=2, delta_diff=1e-4, tol=1e-3, lower=jnp.array([-0.9]), upper=jnp.array([0.9]))
-_ = pistroke_pdet.gradient_descent(iterations=2, delta_diff=1e-4, tol=1e-3, lower=jnp.array([2.4]), upper=jnp.array([100]))
+_ = pistroke_pdet.gradient_descent(iterations=2, delta_diff=-5, tol=1e-2, lower=jnp.array([5e-2]), upper=jnp.array([2]))
 
-print(pistroke_pdet.result_array_gd)
+np.savetxt('redshift_pistroke.dat', pistroke_pdet.result_array_gd)
 
 plt.scatter(pistroke_pdet.result_array_gd[:,0], pistroke_pdet.result_array_gd[:,1])
-plt.savefig('test.pdf',bbox_inches='tight')
+plt.savefig('redshift_test.pdf',bbox_inches='tight')

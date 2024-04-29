@@ -24,10 +24,10 @@ from .distributions import GMMDistribution, uniform_generator
 
 # Generate prior distribution on chi_eff
 qs = bilby.gw.prior.UniformInComponentsMassRatio(0.05,1).sample(10000)
-a1s = np.random.uniform(0,1)
-a2s = np.random.uniform(0,1)
-costilt1s = np.random.uniform(-1,1)
-costilt2s = np.random.uniform(-1,1)
+a1s = np.random.uniform(0,1, size=10000)
+a2s = np.random.uniform(0,1, size=10000)
+costilt1s = np.random.uniform(-1,1, size=10000)
+costilt2s = np.random.uniform(-1,1, size=10000)
 chi_eff_prior = gaussian_kde((a1s*costilt1s + qs * a2s * costilt2s)/(1+qs))
 
 def euclidean_distance_prior(redshift):
@@ -54,17 +54,22 @@ def generate_GMMs(population_file, keys=['mass_1'], sample_size=5000):
 
     sample_dict,_ = gwpopulation.conversions.convert_to_beta_parameters(sample_dict)
 
-    # Load all the relevant events from O3
+    # Load all the relevant events from O3    
     args = argparse.Namespace()
-    args.mass_prior = 'flat-detector'
-    args.spin_prior = 'component'
-    args.distance_prior = 'euclidean'
+    args.mass_prior = {'O4a': 'flat-detector-components', 'O3a': 'flat-detector-components', 
+                       'O3b': 'flat-detector-components', 'GWTC1': 'flat-detector-components'}
+    args.spin_prior = {'O4a': 'component', 'O3a': 'component', 
+                       'O3b': 'component', 'GWTC1': 'component'}
+    args.distance_prior = {'O4a': 'comoving', 'O3a': 'euclidean', 'O3b': 'euclidean', 'GWTC1': 'euclidean'}
     args.parameters = ['mass_1', 'mass_ratio', 'a_1', 'a_2', 'cos_tilt_1', 'cos_tilt_2', 'redshift']
-    args.ignore = ['GW170817_GWTC-1', 'S190425z', 'S200105ae', 'S200115j', 'S190426c', 'S190814bv', 'S190917u']
-    args.gwtc1_samples_regex = '/home/ethan.payne/projects/evidencemaximizedprior/observing_run_PE/O1O2/GW*.hdf5'
-    args.o3a_samples_regex = '/home/ethan.payne/projects/evidencemaximizedprior/observing_run_PE/O3a/*.h5'
-    args.o3b_samples_regex = '/home/ethan.payne/projects/evidencemaximizedprior/observing_run_PE/O3b/*.h5'
-    args.preferred_labels = ['C01:Mixed', 'Mixed', 'PrecessingSpinIMRHM', 'Overall']
+    args.ignore = ['S231123cg-online', 'S230529ay-Exp0', 'S230802aq-EXP1', 'S230830b-online', 'S230810af-online', 
+                   'S231020bw-Exp0', 'S231112ag-online', 'GW170817', 'S190425z', 
+                   'S200105ae', 'S200115j', 'S190426c', 'S190814bv', 'S190917u']
+    args.sample_regex = {'O4a': '/home/jacob.golomb/o4_pe/RP/pe/*.h5', 
+                         'O3b': '/home/jacob.golomb/O3b/O3bPE/S*', 
+                         'O3a': '/home/jacob.golomb/O3b/O3aPE/S*', 
+                         'GWTC1': '/home/jacob.golomb/o4_pe/RP/pe-o1o2/*.h5'}
+    args.preferred_labels = ['Mixed', 'PrecessingSpinIMRHM', 'Overall', 'C01:Mixed', 'IMRPhenomXPHM']
     args.run_dir = 'outdir/'
     args.max_redshift = 1.9
     
@@ -76,10 +81,11 @@ def generate_GMMs(population_file, keys=['mass_1'], sample_size=5000):
     event_GMMs = []
     
     # Looping over all the events to be considered: 
+    counter = 0
     for event_idx, event_str in tqdm(enumerate(event_posteriors)):
         event_name = event_str.split('/')[-1].split('.')[0]
-        print(event_name)
-        if event_name not in args.ignore:# and event_idx < 5:
+        print(counter, event_name)
+        if event_name not in args.ignore:
             event_posterior = event_posteriors[event_str]
 
             event_posterior['chi_eff'] = (event_posterior['a_1']*event_posterior['cos_tilt_1'] + event_posterior['mass_ratio']*event_posterior['a_2']*event_posterior['cos_tilt_2']) / \
@@ -115,7 +121,7 @@ def generate_GMMs(population_file, keys=['mass_1'], sample_size=5000):
                 gwpopulation.utils.truncnorm(np.arccos(event_posterior['cos_tilt_2']), 1, sample_dict['sigma_spin'], 1, -1)
 
             redshift_model = gwpopulation.models.redshift.PowerLawRedshift()
-            population_prior_dict['z'] = redshift_model(
+            population_prior_dict['redshift'] = redshift_model(
                 pd.DataFrame({'redshift':event_posterior['redshift']}), 
                 lamb=sample_dict['lamb']).values.T
     
@@ -129,16 +135,16 @@ def generate_GMMs(population_file, keys=['mass_1'], sample_size=5000):
             prior_dict['a_2'] = 1 * np.ones(len(event_posterior))
             prior_dict['cos_tilt'] = 1/4 * np.ones(len(event_posterior))
 
-            prior_dict['z'] = np.array(z_prior(event_posterior['redshift']))
-            prior_dict['chi_eff'] = np.array(chi_eff_prior(event_posterior['chi_eff']))
+            prior_dict['redshift'] = np.array(z_prior(event_posterior['redshift']))
+            prior_dict['chi_eff'] = np.array(chi_eff_prior(event_posterior['chi_eff'].values))
             
             # now assign the weights based on the desired calculations 
             # should set up for 1D, 2D, and N-D!
             if 'chi_eff' not in keys:
-                keys_for_prior = ['mass_1', 'mass_ratio', 'z', 'a_1', 'a_2', 'cos_tilt']
+                keys_for_prior = ['mass_1', 'mass_ratio', 'redshift', 'a_1', 'a_2', 'cos_tilt']
                 
             else:
-                keys_for_prior = ['mass_1', 'mass_ratio', 'z', 'chi_eff']
+                keys_for_prior = ['mass_1', 'mass_ratio', 'redshift', 'chi_eff']
                 
 
             keys_for_astro = deepcopy(keys_for_prior)
@@ -148,6 +154,10 @@ def generate_GMMs(population_file, keys=['mass_1'], sample_size=5000):
             weights = \
                 np.prod(np.array([population_prior_dict[key] for key in keys_for_astro]),axis=0) /\
                 np.prod(np.array([prior_dict[key] for key in keys_for_prior]),axis=0)
+                
+            weights = np.nan_to_num(weights)
+            weights[weights < 0] = 0
+            weights[weights == np.inf] = 0
                 
             samples_reweighted = event_posterior.sample(
                 frac=0.05, replace=False, weights=weights).reset_index(drop=True)
@@ -163,13 +173,19 @@ def generate_GMMs(population_file, keys=['mass_1'], sample_size=5000):
             
             prior_cdfs = []
             for key in keys:
-                prior_cdfs.append(
-                    uniform_generator(np.min(event_posterior[key])*0.99, 
-                                      np.max(event_posterior[key])*1.01))
+                max = np.max(event_posterior[key])*1.01
+        
+                if np.min(event_posterior[key]) > 0:
+                    min = np.min(event_posterior[key])*0.99
+                else:
+                    min = np.min(event_posterior[key])*1.01
+                
+                prior_cdfs.append(uniform_generator(min, max))
             
             event_GMM = GMMDistribution(samples_reduced.to_numpy(), prior_cdfs)
             
             event_GMMs.append(event_GMM)
+            counter += 1
         
     return event_GMMs
 
@@ -179,10 +195,11 @@ def generate_pdet_GMM(pdet_file, population_file, keys=['mass_1'], snr_threshold
     # pop file: /home/jacob.golomb/O3b/nov24/o1o2o3_default/init/result/o1o2o3_mass_c_iid_mag_iid_tilt_powerlaw_redshift_result.json
     
     # Reading in the injections
-    found_injections_data = pd.DataFrame.from_dict(load_injection_data(pdet_file, snr_threshold=snr_threshold, ifar_threshold=ifar_threshold))
-    found_injections_chi_eff = (found_injections_data['a_1']*found_injections_data['cos_tilt_1'] + \
+    found_injections_data = pd.DataFrame.from_dict(
+        load_injection_data(pdet_file, snr_threshold=snr_threshold, ifar_threshold=ifar_threshold).to_dict())
+    found_injections_data = found_injections_data.assign(chi_eff=(found_injections_data['a_1']*found_injections_data['cos_tilt_1'] + \
         found_injections_data['mass_ratio'] * found_injections_data['a_2'] * found_injections_data['cos_tilt_2']) /\
-        (1+found_injections_data['mass_ratio'])
+        (1+found_injections_data['mass_ratio']))
     
     # Load the population_file
     hyperpe_result = bilby.core.result.read_in_result(population_file)
@@ -222,63 +239,31 @@ def generate_pdet_GMM(pdet_file, population_file, keys=['mass_1'], snr_threshold
         gwpopulation.utils.truncnorm(np.arccos(found_injections_data['cos_tilt_2']), 1, sample_dict['sigma_spin'], 1, -1)
 
     redshift_model = gwpopulation.models.redshift.PowerLawRedshift()
-    population_prior_dict['z'] = redshift_model(
+    population_prior_dict['redshift'] = redshift_model(
         pd.DataFrame({'redshift':np.array(found_injections_data['redshift'])}), 
         lamb=sample_dict['lamb']).values.T
-
-    # Get the contributions to the prior
-    
-    mass_prior = bilby.core.prior.PowerLaw(alpha=-2.35, minimum=2, maximum=100)
-    mass2_prior = bilby.core.prior.PowerLaw(alpha=1.0, minimum=2, maximum=100)
-    
-    prior_dict = {}
-    
-    prior_dict['mass_1'] = mass_prior.prob(found_injections_data['mass_1'])
-    
-    # Calculate the faked chi_eff 
-    chi_eff_prior_dist = []
-    q_prior_dist = []
-    for i in tqdm(range(100000)):
-        mass1 = mass_prior.sample()
-        mass2 = mass2_prior.sample()
-        q = mass2/mass1
-            
-        if q <= 1.0:
-            chi1 = np.random.uniform(0,1); chi2 = np.random.uniform(0,1)
-            t1 = np.random.uniform(-1,1); t2 = np.random.uniform(-1,1)
-            
-            chi_eff_prior_dist.append((chi1*t1 + q*chi2*t2)/(1+q))
-            q_prior_dist.append(q)
-    
-    print(len(found_injections_data['mass_1']))
-    prior_dict['chi_eff'] = gaussian_kde(np.array(chi_eff_prior_dist))(found_injections_chi_eff)
-    prior_dict['mass_ratio'] = gaussian_kde(np.concatenate([np.array(q_prior_dist), 2-np.array(q_prior_dist)]))(found_injections_data['mass_ratio'])
-    prior_dict['a_1'] = 1 * np.ones(len(found_injections_data['mass_1']))
-    prior_dict['a_2'] = 1 * np.ones(len(found_injections_data['mass_1']))
-    prior_dict['cos_tilt'] = 1/4 * np.ones(len(found_injections_data['mass_1']))
-
-    prior_dict['z'] = redshift_model(pd.DataFrame({'redshift':np.array(found_injections_data['redshift'])}), lamb=1.0).values.T
     
     # now assign the weights based on the desired calculations 
     # should set up for 1D, 2D, and N-D!
     if 'chi_eff' not in keys:
-        keys_for_prior = ['mass_1', 'mass_ratio', 'z', 'a_1', 'a_2', 'cos_tilt']
+        keys_for_prior = ['mass_1', 'mass_ratio', 'redshift', 'a_1', 'a_2', 'cos_tilt']
         
     else:
-        keys_for_prior = ['mass_1', 'mass_ratio', 'z', 'chi_eff']
+        keys_for_prior = ['mass_1', 'mass_ratio', 'redshift', 'chi_eff']
         
 
     keys_for_astro = deepcopy(keys_for_prior)
     for key in keys:
         keys_for_astro.remove(key)
 
-    print([len(prior_dict[key]) for key in keys_for_prior])
-    print(np.prod(np.array([prior_dict[key] for key in keys_for_prior]),axis=0))
-
     weights = \
         np.prod(np.array([population_prior_dict[key] for key in keys_for_astro]),axis=0) /\
-        np.prod(np.array([prior_dict[key] for key in keys_for_prior]),axis=0)
-        
+        found_injections_data['prior']
+    
+    weights = np.nan_to_num(weights)
+    weights[weights < 0] = 0
+    weights[weights > 1e100] = 0
+    
     samples_reweighted = found_injections_data.sample(
         frac=0.05, replace=False, weights=weights).reset_index(drop=True)
     
@@ -292,9 +277,14 @@ def generate_pdet_GMM(pdet_file, population_file, keys=['mass_1'], snr_threshold
     
     prior_cdfs = []
     for key in keys:
-        prior_cdfs.append(
-            uniform_generator(np.min(found_injections_data[key])*0.99, 
-                                np.max(found_injections_data[key])*1.01))
+        max = np.max(found_injections_data[key])*1.01+0.1
+        
+        if np.min(found_injections_data[key]) > 0:
+            min = np.min(found_injections_data[key])*0.99-0.1
+        else:
+            min = np.min(found_injections_data[key])*1.01-0.1
+        
+        prior_cdfs.append(uniform_generator(min, max))
     
     pdet_GMM = GMMDistribution(samples_reduced.to_numpy(), prior_cdfs)
     

@@ -62,7 +62,6 @@ class GMMDistribution(object):
         for i in range(self.dimensions):
             prior_probs = self.priors_cdfs[i](samples[:,i])
             
-            
             transformed_samples.append(jnp.sqrt(2)*jax.scipy.special.erfinv(2*prior_probs-1))
         
         return jnp.array(transformed_samples)
